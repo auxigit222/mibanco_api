@@ -6,7 +6,6 @@ import os
 import re
 from datetime import datetime
 
-
 app = Flask(__name__)
 load_dotenv()
 
@@ -19,15 +18,49 @@ db_config = {
     'database': os.getenv('database')
 }
 
+def obtener_ultimo_token():
+    connection = mysql.connector.connect(**db_config)
+    cursor = connection.cursor()
+    try:
+        cursor.execute("SELECT token_mibanco FROM token_mibanco ORDER BY id DESC LIMIT 1")
+        result = cursor.fetchone()
+        token = result[0] if result else None
+        print(f"Último token leído de la base de datos: {token}")  # Imprimir el token leído
+        return token
+    except Error as e:
+        print(f"Error al obtener el último token: {e}")
+        return None
+    finally:
+        if connection.is_connected():
+            cursor.close()
+            connection.close()
+
 @app.route('/')
 def home():
     return '<h1>Bienvenido a la API</h1>'
 
-# Ruta para la consulta de clientes
 @app.route('/MBconsulta', methods=['POST'])
 def consulta_clientes():
     try:
+        headers = request.headers
+        print("Headers recibidos en MBconsulta:", headers)  # Imprimir los headers recibidos
+        
+        # Verificar el token
+        token_recibido = headers.get('Authorization')
+
+        # Comprobar si el encabezado Authorization está presente y no está vacío
+        if not token_recibido:
+            return jsonify({"status": False, "error": "Falta el token de autorización."}), 401
+
+        token_guardado = obtener_ultimo_token()
+        
+        print(f"Token recibido: {token_recibido}")  # Imprimir el token recibido
+        
+        if token_guardado != token_recibido:
+            return jsonify({"status": False, "error": "Token no válido."}), 403
+
         data = request.json
+        print("Datos recibidos en MBconsulta:", data)  # Imprimir el JSON recibido
         id_cliente = data.get("IdCliente")
         monto = data.get("Monto")
         telefono_comercio = data.get("TelefonoComercio")
@@ -43,14 +76,30 @@ def consulta_clientes():
     except Exception as ex:
         return jsonify({"status": False, "error": str(ex)})
 
-
 @app.route('/MBnotifica', methods=['POST'])
 def MBnotifica():
-    connection = None  # Inicializar la variable
-
+    connection = None  
     
     try:
+        headers = request.headers
+        print("Headers recibidos en MBnotifica:", headers)  # Imprimir los headers recibidos
+        
+        # Verificar el token
+        token_recibido = headers.get('Authorization')
+
+        # Comprobar si el encabezado Authorization está presente y no está vacío
+        if not token_recibido:
+            return jsonify({"abono": False, "error": "Falta el token de autorización."}), 401
+
+        token_guardado = obtener_ultimo_token()
+        
+        print(f"Token recibido: {token_recibido}")  # Imprimir el token recibido
+        
+        if token_guardado != token_recibido:
+            return jsonify({"abono": False, "error": "Token no válido."}), 403
+
         data = request.json
+        print("Datos recibidos en MBnotifica:", data)  # Imprimir el JSON recibido
 
         # Validación de campos obligatorios
         required_fields = ["IdComercio", "TelefonoComercio", "TelefonoEmisor", "Concepto", 
@@ -143,4 +192,4 @@ def MBnotifica():
             connection.close()
 
 if __name__ == '__main__':
-    app.run(host="0.0.0.0", debug=True)
+   app.run(host="0.0.0.0", debug=True)
