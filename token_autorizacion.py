@@ -2,7 +2,6 @@ import uuid
 import mysql.connector
 from dotenv import load_dotenv
 import os
-from datetime import datetime
 
 load_dotenv()
 
@@ -24,7 +23,7 @@ def guardar_token_en_mysql(token):
     cursor = conexion.cursor()
 
     # Insertar el token en la base de datos
-    sql = "INSERT INTO token_mibanco (token_mibanco) VALUES (%s)"
+    sql = "INSERT INTO tokens (tokens) VALUES (%s)"
     cursor.execute(sql, (token,))
     conexion.commit()
 
